@@ -1,8 +1,11 @@
-import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:esc_pos_printer/esc_pos_printer.dart';
 import 'package:esc_pos_utils/esc_pos_utils.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_usb_printer/flutter_usb_printer.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:ping_discover_network/ping_discover_network.dart';
 
@@ -38,8 +41,10 @@ class _PrinterAppState extends State<PrinterApp> {
           onPressed: () async {
             if (ipController.text.isNotEmpty &&
                 portController.text.isNotEmpty) {
+              discoverSubConnections();
               setState(() {
                 messageLog = "";
+                messageLog += "Discovering devices...";
                 messageLog =
                     "[${printSizesTitles[selectedPaperSize].title}]Connecting...";
               });
@@ -162,6 +167,21 @@ class _PrinterAppState extends State<PrinterApp> {
         ),
       ),
     );
+  }
+
+  void discoverSubConnections() async {
+    final String ip = (await NetworkInfo().getWifiIP()).toString();
+    final String subnet = ip.substring(0, ip.lastIndexOf('.'));
+    const int port = 80;
+
+    final stream = NetworkAnalyzer.discover2(subnet, port);
+    stream.listen((NetworkAddress addr) {
+      if (addr.exists) {
+        setState(() {
+          messageLog += "\nSubnet device ${addr.ip}";
+        });
+      }
+    });
   }
 
   void connectToPrinter() async {
