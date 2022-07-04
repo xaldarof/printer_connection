@@ -1,10 +1,6 @@
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:esc_pos_printer/esc_pos_printer.dart';
 import 'package:esc_pos_utils/esc_pos_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_usb_printer/flutter_usb_printer.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:ping_discover_network/ping_discover_network.dart';
@@ -29,7 +25,9 @@ class _PrinterAppState extends State<PrinterApp> {
 
   TextEditingController ipController = TextEditingController();
   TextEditingController portController = TextEditingController();
-  String messageLog = "";
+  var messageLog = <String>[];
+  var successMessage = "";
+  var bruteForce = false;
 
   @override
   Widget build(BuildContext context) {
@@ -39,16 +37,22 @@ class _PrinterAppState extends State<PrinterApp> {
         floatingActionButton: FloatingActionButton(
           child: const Icon(Icons.connect_without_contact),
           onPressed: () async {
+            var devices = await FlutterUsbPrinter.getUSBDeviceList();
+            print("Devices  $devices");
+
             if (ipController.text.isNotEmpty &&
-                portController.text.isNotEmpty) {
-              discoverSubConnections();
+                    portController.text.isNotEmpty ||
+                bruteForce) {
               setState(() {
-                messageLog = "";
-                messageLog += "Discovering devices...";
-                messageLog =
-                    "[${printSizesTitles[selectedPaperSize].title}]Connecting...";
+                successMessage = "";
               });
-              connectToPrinter();
+
+              _discoverSubConnections();
+              _printLog("");
+              _printLog("Discovering devices...");
+              _printLog(
+                  "[${printSizesTitles[selectedPaperSize].title}]Connecting...");
+              _connectToPrinter();
             }
           },
         ),
@@ -78,7 +82,7 @@ class _PrinterAppState extends State<PrinterApp> {
                   ),
                 ),
                 Flexible(
-                  flex: 1,
+                  flex: 2,
                   child: Container(
                     margin: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -98,8 +102,21 @@ class _PrinterAppState extends State<PrinterApp> {
                     ),
                   ),
                 ),
+                Checkbox(
+                    value: bruteForce,
+                    onChanged: (value) {
+                      setState(() {
+                        bruteForce = value ?? false;
+                      });
+                    }),
+                const Padding(padding: EdgeInsets.all(12))
               ],
             ),
+            Text(successMessage,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                    fontSize: 16)),
             Flexible(
                 flex: 1,
                 child: ListView.builder(
@@ -146,30 +163,40 @@ class _PrinterAppState extends State<PrinterApp> {
                               selectedPaperSize = index;
                             });
                           },
-                        )
+                        ),
                       ],
                     );
                   },
                 )),
             Flexible(
-                flex: 8,
-                child: Row(
-                  children: [
-                    const Padding(padding: EdgeInsets.only(left: 12)),
-                    Text(
-                      messageLog,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, color: Colors.black),
-                    )
-                  ],
-                )),
+              flex: 8,
+              child: ListView.builder(
+                scrollDirection: Axis.vertical,
+                itemCount: messageLog.length,
+                itemBuilder: (context, index) {
+                  return Row(children: [
+                    GestureDetector(
+                        child: Container(
+                      margin: EdgeInsets.all(12),
+                      child: Text(
+                        messageLog[index],
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                            fontSize: 16),
+                      ),
+                    ))
+                  ]);
+                },
+              ),
+            )
           ],
         ),
       ),
     );
   }
 
-  void discoverSubConnections() async {
+  void _discoverSubConnections() async {
     final String ip = (await NetworkInfo().getWifiIP()).toString();
     final String subnet = ip.substring(0, ip.lastIndexOf('.'));
     const int port = 80;
@@ -178,52 +205,57 @@ class _PrinterAppState extends State<PrinterApp> {
     stream.listen((NetworkAddress addr) {
       if (addr.exists) {
         setState(() {
-          messageLog += "\nSubnet device ${addr.ip}";
+          _printLog("Subnet device ${addr.ip}");
         });
       }
     });
   }
 
-  void connectToPrinter() async {
+  void _connectToPrinter() async {
+    if (bruteForce) {
+      for (int i = 0; i < 255; i++) {
+        _connect("192.168.0.$i", "80");
+        _printLog("Try to connect 192.168.0.$i}");
+      }
+    } else {
+      _connect(null, null);
+    }
+  }
+
+  void _connect(String? ip, String? port) async {
     final profile = await CapabilityProfile.load();
     final printer = NetworkPrinter(printSizes[selectedPaperSize], profile);
 
-    final PosPrintResult res = await printer.connect(ipController.text,
-        port: int.parse(portController.text));
+    final PosPrintResult res = await printer.connect(ip ?? ipController.text,
+        port: int.parse(port ?? portController.text));
 
     if (res == PosPrintResult.success) {
-      setState(() {
-        messageLog += "\nSuccess";
-        messageLog = "\nPrinting";
-      });
+      _printLog("Success connect to $port");
+      _printLog("Printing...");
 
-      testReceipt(printer);
+      _testReceipt(printer);
       setState(() {
-        messageLog += "Sucess connect to ${printer.host}";
+        successMessage = "Sucess connect to ${printer.host}";
+        _printLog("Sucess connect to ${printer.host}");
       });
       printer.disconnect();
-      setState(() {
-        messageLog += "\nDisconnected !";
-      });
+      _printLog("Disconnected !");
     } else {
-      setState(() {
-        messageLog += "\n${res.msg}";
-      });
+      _printLog(
+          "${res.msg} to ${ip ?? ipController.text}     [${port ?? ipController.text}]");
     }
-
-    print('Print result: ${res.msg}');
   }
 
-  void testReceipt(NetworkPrinter printer) {
+  void _testReceipt(NetworkPrinter printer) {
     printer.text(
         'Regular: aA bB cC dD eE fF gG hH iI jJ kK lL mM nN oO pP qQ rR sS tT uU vV wW xX yY zZ');
     printer.text('Special 1: àÀ èÈ éÉ ûÛ üÜ çÇ ôÔ',
         styles: const PosStyles(codeTable: 'CP1252'));
     printer.text('Special 2: blåbærgrød',
-        styles: PosStyles(codeTable: 'CP1252'));
+        styles: const PosStyles(codeTable: 'CP1252'));
 
-    printer.text('Bold text', styles: PosStyles(bold: true));
-    printer.text('Reverse text', styles: PosStyles(reverse: true));
+    printer.text('Bold text', styles: const PosStyles(bold: true));
+    printer.text('Reverse text', styles: const PosStyles(reverse: true));
     printer.text('Underlined text',
         styles: const PosStyles(underline: true), linesAfter: 1);
     printer.text('Align left', styles: PosStyles(align: PosAlign.left));
@@ -239,6 +271,16 @@ class _PrinterAppState extends State<PrinterApp> {
 
     printer.feed(2);
     printer.cut();
+  }
+
+  _printLog(String message) {
+    setState(() {
+      if (message.isNotEmpty) {
+        messageLog.add(message);
+      } else {
+        messageLog.clear();
+      }
+    });
   }
 }
 
