@@ -16,7 +16,13 @@ class PrinterApp extends StatefulWidget {
 }
 
 class _PrinterAppState extends State<PrinterApp> {
-  var devices = <WifiInfoData>[];
+  var printSizes = <PaperSize>[PaperSize.mm58, PaperSize.mm80];
+  var printSizesTitles = <PrintSize>[
+    PrintSize(title: "MM 58", isSelected: false),
+    PrintSize(title: "MM 80", isSelected: false)
+  ];
+
+  int selectedPaperSize = -1;
 
   TextEditingController ipController = TextEditingController();
   TextEditingController portController = TextEditingController();
@@ -34,7 +40,8 @@ class _PrinterAppState extends State<PrinterApp> {
                 portController.text.isNotEmpty) {
               setState(() {
                 messageLog = "";
-                messageLog = "Connecting...";
+                messageLog =
+                    "[${printSizesTitles[selectedPaperSize].title}]Connecting...";
               });
               connectToPrinter();
             }
@@ -88,60 +95,96 @@ class _PrinterAppState extends State<PrinterApp> {
                 ),
               ],
             ),
-            Row(
-              children: [
-                const Padding(padding: EdgeInsets.only(left: 24)),
-                Text(
-                  messageLog,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, color: Colors.black),
-                )
-              ],
-            ),
+            Flexible(
+                flex: 1,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: printSizesTitles.length,
+                  itemBuilder: (context, index) {
+                    var backgroundColor = Color(Colors.white.value);
+                    if (index == selectedPaperSize) {
+                      backgroundColor = Color(Colors.blue[300]?.value ?? 1);
+                    } else {
+                      backgroundColor = Color(Colors.white.value);
+                    }
+
+                    return Row(
+                      children: [
+                        GestureDetector(
+                          child: Container(
+                            width: 128,
+                            height: 128,
+                            margin: EdgeInsets.all(12),
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16.0),
+                              color: backgroundColor,
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.grey,
+                                  offset: Offset(0.0, 1.0),
+                                  blurRadius: 6.0,
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              printSizesTitles[index].title,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                  fontSize: 16),
+                            ),
+                          ),
+                          onTap: () {
+                            setState(() {
+                              selectedPaperSize = index;
+                            });
+                          },
+                        )
+                      ],
+                    );
+                  },
+                )),
+            Flexible(
+                flex: 8,
+                child: Row(
+                  children: [
+                    const Padding(padding: EdgeInsets.only(left: 12)),
+                    Text(
+                      messageLog,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, color: Colors.black),
+                    )
+                  ],
+                )),
           ],
         ),
       ),
     );
   }
 
-  discoverDevices() async {
-    final info = NetworkInfo();
-    var wifiIP = await info.getWifiIP();
-    var wifiName = await info.getWifiName();
-    final String subnet =
-        wifiIP.toString().substring(0, wifiIP.toString().lastIndexOf('.'));
-    const int port = 80;
-
-    final stream = NetworkAnalyzer.discover2(subnet, port);
-
-    stream.listen((NetworkAddress addr) {
-      if (addr.exists) {
-        setState(() {
-          devices.add(WifiInfoData(ip: addr.ip, name: wifiName.toString()));
-        });
-
-        print('Found device: ${addr.ip}');
-      }
-    });
-  }
-
   void connectToPrinter() async {
-    const PaperSize paper = PaperSize.mm80;
     final profile = await CapabilityProfile.load();
-    final printer = NetworkPrinter(paper, profile);
+    final printer = NetworkPrinter(printSizes[selectedPaperSize], profile);
 
     final PosPrintResult res = await printer.connect(ipController.text,
         port: int.parse(portController.text));
 
     if (res == PosPrintResult.success) {
-      messageLog += "\nSuccess";
-      messageLog = "\nPrinting";
+      setState(() {
+        messageLog += "\nSuccess";
+        messageLog = "\nPrinting";
+      });
+
       testReceipt(printer);
       setState(() {
         messageLog += "Sucess connect to ${printer.host}";
       });
       printer.disconnect();
-      messageLog += "\nDisconnected !";
+      setState(() {
+        messageLog += "\nDisconnected !";
+      });
     } else {
       setState(() {
         messageLog += "\n${res.msg}";
@@ -179,12 +222,12 @@ class _PrinterAppState extends State<PrinterApp> {
   }
 }
 
-class WifiInfoData {
-  final String name;
-  final String ip;
+class PrintSize {
+  String title;
+  bool isSelected;
 
-  const WifiInfoData({
-    required this.name,
-    required this.ip,
+  PrintSize({
+    required this.title,
+    required this.isSelected,
   });
 }
