@@ -19,106 +19,88 @@ class _PrinterAppState extends State<PrinterApp> {
   var devices = <WifiInfoData>[];
 
   TextEditingController ipController = TextEditingController();
-  String errors = "";
+  TextEditingController portController = TextEditingController();
+  String messageLog = "";
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
-          floatingActionButton: FloatingActionButton(
-            child: const Icon(Icons.connect_without_contact),
-            onPressed: () async {
-              if (ipController.text.isNotEmpty) {
-                setState(() {
-                  errors = "";
-                });
-                connectToPrinter(ipController.text);
-              }
-              devices.clear();
-              discoverDevices();
-            },
-          ),
-          body: Column(
-            children: [
-              Container(
-                margin: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: Colors.black12),
-                child: TextField(
-                  controller: ipController,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    errorBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.only(
-                        left: 15, bottom: 10, top: 10, right: 15),
+        floatingActionButton: FloatingActionButton(
+          child: const Icon(Icons.connect_without_contact),
+          onPressed: () async {
+            if (ipController.text.isNotEmpty &&
+                portController.text.isNotEmpty) {
+              setState(() {
+                messageLog = "";
+                messageLog = "Connecting...";
+              });
+              connectToPrinter();
+            }
+          },
+        ),
+        body: Column(
+          children: [
+            Row(
+              children: [
+                Flexible(
+                  flex: 15,
+                  child: Container(
+                    margin: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.black12),
+                    child: TextField(
+                      controller: ipController,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        contentPadding: EdgeInsets.only(
+                            left: 15, bottom: 10, top: 10, right: 15),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              Row(
-                children: [Text(errors)],
-              ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: devices.length,
-                  itemBuilder: (context, index) {
-                    return Container(
-                      padding: const EdgeInsets.all(12),
-                      margin: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16.0),
-                        color: Colors.white,
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.grey,
-                            offset: Offset(0.0, 1.0),
-                            blurRadius: 6.0,
-                          ),
-                        ],
+                Flexible(
+                  flex: 1,
+                  child: Container(
+                    margin: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.black12),
+                    child: TextField(
+                      controller: portController,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        contentPadding: EdgeInsets.only(
+                            left: 15, bottom: 10, top: 10, right: 15),
                       ),
-                      height: 100,
-                      child: Column(
-                        children: [
-                          const Spacer(),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Flexible(
-                                fit: FlexFit.tight,
-                                flex: 8,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 1,
-                                      devices[index].name,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 18),
-                                    ),
-                                    Text(devices[index].ip),
-                                  ],
-                                ),
-                              ),
-                              const Spacer(),
-                            ],
-                          ),
-                          const Spacer()
-                        ],
-                      ),
-                    );
-                    ;
-                  },
+                    ),
+                  ),
                 ),
-              )
-            ],
-          )),
+              ],
+            ),
+            Row(
+              children: [
+                const Padding(padding: EdgeInsets.only(left: 24)),
+                Text(
+                  messageLog,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.black),
+                )
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -143,22 +125,26 @@ class _PrinterAppState extends State<PrinterApp> {
     });
   }
 
-  void connectToPrinter(String localIp) async {
+  void connectToPrinter() async {
     const PaperSize paper = PaperSize.mm80;
     final profile = await CapabilityProfile.load();
     final printer = NetworkPrinter(paper, profile);
 
-    final PosPrintResult res = await printer.connect(localIp, port: 9100);
+    final PosPrintResult res = await printer.connect(ipController.text,
+        port: int.parse(portController.text));
 
     if (res == PosPrintResult.success) {
+      messageLog += "\nSuccess";
+      messageLog = "\nPrinting";
       testReceipt(printer);
       setState(() {
-        errors += "Sucess connect to ${printer.host}";
+        messageLog += "Sucess connect to ${printer.host}";
       });
       printer.disconnect();
+      messageLog += "\nDisconnected !";
     } else {
       setState(() {
-        errors += "\n${res.msg}";
+        messageLog += "\n${res.msg}";
       });
     }
 
