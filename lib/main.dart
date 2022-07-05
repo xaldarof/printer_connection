@@ -40,9 +40,7 @@ class _PrinterAppState extends State<PrinterApp> {
             var devices = await FlutterUsbPrinter.getUSBDeviceList();
             print("Devices  $devices");
 
-            if (ipController.text.isNotEmpty &&
-                    portController.text.isNotEmpty ||
-                bruteForce) {
+            if (ipController.text.isNotEmpty || bruteForce) {
               setState(() {
                 successMessage = "";
               });
@@ -118,56 +116,57 @@ class _PrinterAppState extends State<PrinterApp> {
                     color: Colors.green,
                     fontSize: 16)),
             Flexible(
-                flex: 1,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: printSizesTitles.length,
-                  itemBuilder: (context, index) {
-                    var backgroundColor = Color(Colors.white.value);
-                    if (index == selectedPaperSize) {
-                      backgroundColor = Color(Colors.blue[300]?.value ?? 1);
-                    } else {
-                      backgroundColor = Color(Colors.white.value);
-                    }
+              flex: 1,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: printSizesTitles.length,
+                itemBuilder: (context, index) {
+                  var backgroundColor = Color(Colors.white.value);
+                  if (index == selectedPaperSize) {
+                    backgroundColor = Color(Colors.blue[300]?.value ?? 1);
+                  } else {
+                    backgroundColor = Color(Colors.white.value);
+                  }
 
-                    return Row(
-                      children: [
-                        GestureDetector(
-                          child: Container(
-                            width: 128,
-                            height: 128,
-                            margin: EdgeInsets.all(12),
-                            alignment: Alignment.center,
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16.0),
-                              color: backgroundColor,
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.grey,
-                                  offset: Offset(0.0, 1.0),
-                                  blurRadius: 6.0,
-                                ),
-                              ],
-                            ),
-                            child: Text(
-                              printSizesTitles[index].title,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black,
-                                  fontSize: 16),
-                            ),
+                  return Row(
+                    children: [
+                      GestureDetector(
+                        child: Container(
+                          width: 128,
+                          height: 128,
+                          margin: const EdgeInsets.all(12),
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16.0),
+                            color: backgroundColor,
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.grey,
+                                offset: Offset(0.0, 1.0),
+                                blurRadius: 6.0,
+                              ),
+                            ],
                           ),
-                          onTap: () {
-                            setState(() {
-                              selectedPaperSize = index;
-                            });
-                          },
+                          child: Text(
+                            printSizesTitles[index].title,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                                fontSize: 16),
+                          ),
                         ),
-                      ],
-                    );
-                  },
-                )),
+                        onTap: () {
+                          setState(() {
+                            selectedPaperSize = index;
+                          });
+                        },
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
             Flexible(
               flex: 8,
               child: ListView.builder(
@@ -214,7 +213,7 @@ class _PrinterAppState extends State<PrinterApp> {
   void _connectToPrinter() async {
     if (bruteForce) {
       for (int i = 0; i < 255; i++) {
-        _connect("192.168.0.$i", "80");
+        _connect("192.168.0.$i", portController.text);
         _printLog("Try to connect 192.168.0.$i}");
       }
     } else {
@@ -247,27 +246,10 @@ class _PrinterAppState extends State<PrinterApp> {
   }
 
   void _testReceipt(NetworkPrinter printer) {
+    var date = DateTime.now();
     printer.text(
-        'Regular: aA bB cC dD eE fF gG hH iI jJ kK lL mM nN oO pP qQ rR sS tT uU vV wW xX yY zZ');
-    printer.text('Special 1: àÀ èÈ éÉ ûÛ üÜ çÇ ôÔ',
-        styles: const PosStyles(codeTable: 'CP1252'));
-    printer.text('Special 2: blåbærgrød',
-        styles: const PosStyles(codeTable: 'CP1252'));
-
-    printer.text('Bold text', styles: const PosStyles(bold: true));
-    printer.text('Reverse text', styles: const PosStyles(reverse: true));
-    printer.text('Underlined text',
-        styles: const PosStyles(underline: true), linesAfter: 1);
-    printer.text('Align left', styles: PosStyles(align: PosAlign.left));
-    printer.text('Align center', styles: PosStyles(align: PosAlign.center));
-    printer.text('Align right',
-        styles: PosStyles(align: PosAlign.right), linesAfter: 1);
-
-    printer.text('Text size 200%',
-        styles: const PosStyles(
-          height: PosTextSize.size2,
-          width: PosTextSize.size2,
-        ));
+        "Xoldarov Temur check ${date.hour}/${date.minute}/${date.second}",
+        styles: const PosStyles(bold: true, align: PosAlign.center));
 
     printer.feed(2);
     printer.cut();
